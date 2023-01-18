@@ -3,7 +3,7 @@
   Reaktor Assignment
 */
 
-const TOKEN = "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";
+const TOKEN = "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";
 const GIST_ID = "000397649efc24684b6b63164bfcfbb9";
 const GIST_FILENAME = "dronedb.json";
 
@@ -58,6 +58,8 @@ async function start() {
     console.log("time:", time.toISOString());
 
     var i = 0;
+    var data = {};
+    var dataOut = {};
     while (i < droneList.length) {
 
       console.log("i", i, ": \n", droneList[i]);
@@ -94,12 +96,13 @@ async function start() {
 
       // If it's within 100-meter radius
       //if (i == 0) {
-      var data = {};
-      if (eucDis(x, y) <= 100) {
+      
+      var gistData = await getGData();
+      if (eucDis(x, y) <= 100000) {
         // Fetch existing gist data
-        var gistData = await getGData();
-        console.log("existing jsondata: ", JSON.stringify(gistData));
-        console.log("new id: ", JSON.stringify(pid));
+        console.log("Violator!")
+        //console.log("existing jsondata: ", JSON.stringify(gistData));
+        //console.log("new id: ", JSON.stringify(pid));
 
         // Check if the drone list attendee appears on gist data
         var j = 0;
@@ -117,7 +120,7 @@ async function start() {
         }
         // Now we can save new data,
         // combine it with pre-existing data object
-        console.log("Storing!")
+        //console.log("Storing!")
         data = {
           "violator": [{
             "dronesn": snum,
@@ -133,8 +136,8 @@ async function start() {
         var dataStr = JSON.stringify(data);
         dataStr = dataStr.replace("violator", pid);
         data = JSON.parse(dataStr);
-        data = Object.assign({}, data, gistData);
-        console.log("data: ", data)
+        dataOut = Object.assign({}, data, gistData);
+        console.log("dataOut: ", dataOut)
 
         // Check timestamps and delete objects accordingly
         var k = 0;
@@ -148,10 +151,15 @@ async function start() {
             delete data[key];
           }
         }
-        // Save data to gist
-        setGData(data);
+        
+      }
+      else {
+        //dataOut = await getGData();
       }
       
+
+      // Save data to gist
+      setGData(dataOut);
       i += 1;
     }
   }
@@ -202,6 +210,7 @@ async function getGData() {
 
 // Set gist (temp) data
 async function setGData(data) {
+  console.log("Setting gist data!", data)
   const req = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
     method: "PATCH",
     headers: {
