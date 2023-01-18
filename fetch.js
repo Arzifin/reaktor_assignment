@@ -148,9 +148,10 @@ async function start() {
             delete data[key];
           }
         }
+        // Save data to gist
+        setGData(data);
       }
-      // Save data to gist
-      setGData(data);
+      
       i += 1;
     }
   }
