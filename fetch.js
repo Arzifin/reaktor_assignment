@@ -3,7 +3,7 @@
   Reaktor Assignment
 */
 
-const TOKEN = "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";
+const TOKEN = "omitted";
 const GIST_ID = "000397649efc24684b6b63164bfcfbb9";
 const GIST_FILENAME = "dronedb.json";
 
@@ -60,6 +60,7 @@ async function start() {
     var i = 0;
     var data = {};
     var dataOut = {};
+    let gistData = await getGData();
     while (i < droneList.length) {
 
       console.log("i", i, ": \n", droneList[i]);
@@ -96,28 +97,13 @@ async function start() {
 
       // If it's within 100-meter radius
       //if (i == 0) {
-      
-      var gistData = await getGData();
+
+      //let gistData = await getGData();
       if (eucDis(x, y) <= 100000) {
         // Fetch existing gist data
         console.log("Violator!")
-        //console.log("existing jsondata: ", JSON.stringify(gistData));
-        //console.log("new id: ", JSON.stringify(pid));
 
-        // Check if the drone list attendee appears on gist data
-        var j = 0;
-        while (j < gistData.length) {
-          // Matching ID found, update last seen
-          if (pid == Object.keys(gistData)[j]) {
-            console.log("Updating ", gistData[pid][0]["timestamp"], " to ", time.toISOString());
-            gistData[pid][0]["timestamp"] = time.toISOString();
 
-            // If distance has shortened, update it
-            if (Object.keys(gistData)[j][0]["dist"] > eudis) {
-              Object.keys(gistData)[j][0]["dist"] = eudis;
-            }
-          }
-        }
         // Now we can save new data,
         // combine it with pre-existing data object
         //console.log("Storing!")
@@ -132,11 +118,33 @@ async function start() {
             "dist": eudis,
           }]
         };
-        // Replace violator with pilot id
+
+        // Check if the drone list attendee appears on gist data
+        var j = 0;
+        while (j < gistData.length) {
+          // Matching ID found, update last seen
+          if (pid == Object.keys(gistData)[j]) {
+            console.log("Updating ", gistData[pid][0]["timestamp"], " to ", time.toISOString());
+            gistData[pid][0]["timestamp"] = time.toISOString();
+
+            // If distance has shortened, update it
+            if (Object.keys(gistData)[j][0]["dist"] > eudis) {
+              Object.keys(gistData)[j][0]["dist"] = eudis;
+            }
+          }
+          // If identical ID is found, then do not re-add
+          else {
+            data = {}
+          }
+        }
+        
+        // Form new JSON object from old and new data
         var dataStr = JSON.stringify(data);
         dataStr = dataStr.replace("violator", pid);
         data = JSON.parse(dataStr);
-        dataOut = Object.assign({}, data, gistData);
+        // Fetch old data
+        //gistData = await getGData();
+        dataOut = Object.assign({}, gistData, data);
         console.log("dataOut: ", dataOut)
 
         // Check timestamps and delete objects accordingly
@@ -148,20 +156,31 @@ async function start() {
           // If 10 minutes have passed
           console.log("timedelta: ", dateFromString(keyDate).getTime() - time.getTime())
           if (dateFromString(keyDate).getTime() - time.getTime() <= 600000) {
-            delete data[key];
+            console.log("deleted because of time!")
+            delete dataOut[key];
           }
         }
-        
+
+        // Save the data changes
+        //setGData(dataOut);
+
       }
       else {
         //dataOut = await getGData();
       }
-      
+
+      // Update look of HTML element
+      var output = document.getElementById("out");
+      output.innerHTML = 'Violators:' + "<br />" + JSON.stringify(dataOut);
 
       // Save data to gist
-      setGData(dataOut);
+      //setGData(dataOut);
+
       i += 1;
     }
+    // Save data to gist
+    // Try not to access gist too often (limitations)
+    setGData(dataOut);
   }
   // Repeats function (every 15s)
   // setTimeout(start, 15000);
@@ -210,7 +229,7 @@ async function getGData() {
 
 // Set gist (temp) data
 async function setGData(data) {
-  console.log("Setting gist data!", data)
+  //console.log("Setting gist data!", data)
   const req = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
     method: "PATCH",
     headers: {
