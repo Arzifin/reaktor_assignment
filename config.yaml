@@ -1,0 +1,5 @@
+steps:
+  - name: Secret action
+    env: 
+        SECRET_GIST_TOKEN = ${{ secrets.SECRET_GIST_TOKEN }}
+
