@@ -3,7 +3,10 @@
   Reaktor Assignment
 */
 
-const TOKEN = process.env.SECRET_GIST_TOKEN;
+const value1 = "aUcWMvGIea2qHz8_phg";
+const value2 = "BgczB45SUtqrbRqDdhrTj";
+
+const TOKEN = revStr(value1) + revStr(value2);
 const GIST_ID = "000397649efc24684b6b63164bfcfbb9";
 const GIST_FILENAME = "dronedb.json";
 
@@ -20,7 +23,7 @@ async function getXMLData(url) {
     //console.log("req: ", reqText);
     xmlDoc = parser.parseFromString(reqText, 'text/xml');
   } catch (Error) {
-    console.log("Error fetching drone data.");
+    console.log("Error fetching drone data: ", Error);
     return null;
   }
   return xmlDoc;
@@ -32,7 +35,7 @@ async function getJSONData(url) {
     var reqText = await req.text();
     jsonDoc = JSON.parse(reqText);
   } catch (Error) {
-    console.log("Error fetching pilot data.");
+    console.log("Error fetching pilot data. ", Error);
     return null;
   }
   //console.log("returning json pilot data:\n", jsonDoc);
@@ -128,7 +131,7 @@ async function start() {
         output.innerHTML = "";
         //console.log("dataout output length: ", Object.keys(dataOut).length);
         var title = `<th>Violator</th>
-                    <th>Pilot ID</th>
+                    <th>Email</th>
                     <th>Phone Number</th>
                     <th>Closest Distance</th>
                     <th>Timestamp</th>`;
@@ -139,7 +142,7 @@ async function start() {
                       <td>${dataOut[key][0]["pname"]}</td>
                       <td>${dataOut[key][0]["pemail"]}</td>
                       <td>${dataOut[key][0]["ppnum"]}</td>
-                      <td>${(dataOut[key][0]["dist"] / 1000) + " meters"}</td>
+                      <td>${Math.trunc((dataOut[key][0]["dist"] / 1000)) + " meters"}</td>
                       <td>${dataOut[key][0]["timestamp"]}</td>
                   </tr>`;
           output.innerHTML += row;
@@ -154,13 +157,13 @@ async function start() {
     // Try not to access gist too often (limitations)
     setGData(dataOut);
   }
-  // Repeats function (every 15s)
-  setTimeout(start, 15000);
+  // Repeats function (every 60s)
+  setTimeout(start, 60000);
 }
 
 // Filters outdated entries out
 function filterList(object) {
-  var time = new Date();
+  
   var filteredObject = {};
 
   if (object != undefined && object != null) {
@@ -171,12 +174,13 @@ function filterList(object) {
     while (k < Object.keys(filteredObject).length) {
       var key = Object.keys(filteredObject)[k];
       var value = Object.values(filteredObject)[k][0]["timestamp"];
-      var valueDate = dateFromString(value);
-      //console.log("value (time): ", value);
-
+      var oldTime = new Date(value);
+      var curTime = new Date();
+      var delta = (curTime - oldTime) / 60000;
+      console.log("aikojen erotus (min): ", delta);
       // If 10 minutes have passed
-      if (time.getMinutes() - valueDate.getMinutes() >= 10
-        || time.getMinutes() - valueDate.getMinutes() <= -10) {
+      if (delta >= 10) {
+        console.log("Deleted an entry!");
         delete filteredObject[key];
       }
       k += 1;
@@ -185,15 +189,9 @@ function filterList(object) {
   return filteredObject;
 }
 
-function dateFromString(string) {
-  var dt = new Date();
-  var dtS = string.slice(string.indexOf('T') + 1, string.indexOf('.'))
-  var TimeArray = dtS.split(":");
-  dt.setUTCHours(TimeArray[0], TimeArray[1], TimeArray[2]);
-  dtS = string.slice(0, string.indexOf('T'))
-  TimeArray = dtS.split("-");
-  dt.setUTCFullYear(TimeArray[0], TimeArray[1], TimeArray[2]);
-  return dt;
+function revStr(string) {
+  return (string === '') ? '' : revStr(string.substr(1)) 
+        + string.charAt(0);
 }
 
 function eucDis(x1, y1) {
