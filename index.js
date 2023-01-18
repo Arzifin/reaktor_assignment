@@ -10,8 +10,8 @@ const TOKEN = revStr(value1) + revStr(value2);
 const GIST_ID = "000397649efc24684b6b63164bfcfbb9";
 const GIST_FILENAME = "dronedb.json";
 
-const droneApiUrl = "https://assignments.reaktor.com/birdnest/drones";
-const pilotApiUrl = "https://assignments.reaktor.com/birdnest/pilots/";
+const droneApiUrl = "https://cors-anywhere.herokuapp.com/https://assignments.reaktor.com/birdnest/drones";
+const pilotApiUrl = "https://cors-anywhere.herokuapp.com/https://assignments.reaktor.com/birdnest/pilots/";
 
 // Fetches and returns parsed XML doc (of drones)
 async function getXMLData(url) {
