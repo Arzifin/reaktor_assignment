@@ -3,7 +3,7 @@
   Reaktor Assignment
 */
 
-const TOKEN = "omitted";
+const TOKEN = process.env.SECRET_GIST_TOKEN;
 const GIST_ID = "000397649efc24684b6b63164bfcfbb9";
 const GIST_FILENAME = "dronedb.json";
 
@@ -13,7 +13,7 @@ const pilotApiUrl = "https://cors-anywhere.herokuapp.com/https://assignments.rea
 // Fetches and returns parsed XML doc (of drones)
 async function getXMLData(url) {
   try {
-    console.log("Fetching!")
+    //console.log("Fetching!")
     var parser = new DOMParser(), xmlDoc;
     var req = await fetch(url);
     var reqText = await req.text();
@@ -28,7 +28,6 @@ async function getXMLData(url) {
 // Fetches and returns parsed JSON doc (of pilots)
 async function getJSONData(url) {
   try {
-    console.log("Fetching!")
     var req = await fetch(url);
     var reqText = await req.text();
     jsonDoc = JSON.parse(reqText);
@@ -36,146 +35,119 @@ async function getJSONData(url) {
     console.log("Error fetching pilot data.");
     return null;
   }
+  //console.log("returning json pilot data:\n", jsonDoc);
   return jsonDoc;
 }
-
 
 async function start() {
   // Fetch drone XML document
   var xmlDroneDoc = await getXMLData(droneApiUrl);
-
   if (xmlDroneDoc != undefined) {
-    console.log(xmlDroneDoc)
-
+    // Fetch all drone elements from XML document
     var droneList = xmlDroneDoc.getElementsByTagName('drone');
-    console.log("Drone:\n", xmlDroneDoc.getElementsByTagName('drone'));
-
+    // Get violators timestamp (near current time)
     var timestamp = xmlDroneDoc.getElementsByTagName('capture')[0].getAttribute("snapshotTimestamp");
-    console.log("timestamp: ", timestamp);
-
-
+    // Get current time (date)
     var time = new Date();
-    console.log("time:", time.toISOString());
 
     var i = 0;
     var data = {};
-    var dataOut = {};
-    let gistData = await getGData();
+    // Fetch existing gist data, prepare variables
+    let dataOut = await getGData(),
+      gistData = dataOut;
     while (i < droneList.length) {
+      try {
+        // Position X of Drone
+        var x = droneList[i].childNodes[17].firstChild.nodeValue;
+        // Position Y of Drone
+        var y = droneList[i].childNodes[15].firstChild.nodeValue;
+        // Calculate distance
+        var eudis = eucDis(x, y);
+        // Serial number
+        var snum = droneList[i].childNodes[1].firstChild.nodeValue;
+        // Fetch pilot info for every element
+        var jsonPilotDoc = await getJSONData(pilotApiUrl + snum);
 
-      console.log("i", i, ": \n", droneList[i]);
-
-      // ID of Drone
-      //var id = droneList[ind].firstElementChild.firstChild.nodeValue;
-      //console.log("id:", id);
-      // Position X of Drone
-      var x = droneList[i].childNodes[17].firstChild.nodeValue;
-      console.log("PosX:", x);
-      // Position Y of Drone
-      var y = droneList[i].childNodes[15].firstChild.nodeValue;
-      console.log("PosY:", y);
-
-      var eudis = eucDis(x, y);
-      console.log("Distance: ", eudis);
-
-
-      // Serial number
-      var snum = droneList[i].childNodes[1].firstChild.nodeValue;
-      console.log("snum: ", snum);
-      // Fetch pilot info for every element
-      var jsonPilotDoc = await getJSONData(pilotApiUrl + snum);
-
-
-      var pname = jsonPilotDoc['firstName'] + " " + jsonPilotDoc['lastName']
-      console.log("pname: ", pname);
-      var ppnum = jsonPilotDoc['phoneNumber'];
-      var pemail = jsonPilotDoc['email'];
-      var pid = jsonPilotDoc['pilotId'];
-
-
-      //console.log("criminal spotted! D:")
-
-      // If it's within 100-meter radius
-      //if (i == 0) {
-
-      //let gistData = await getGData();
-      if (eucDis(x, y) <= 100000) {
-        // Fetch existing gist data
-        console.log("Violator!")
-
-
-        // Now we can save new data,
-        // combine it with pre-existing data object
-        //console.log("Storing!")
-        data = {
-          "violator": [{
-            "dronesn": snum,
-            "pilotid": pid,
-            "pname": pname,
-            "pemail": pemail,
-            "ppnum": ppnum,
-            "timestamp": timestamp,
-            "dist": eudis,
-          }]
-        };
-
-        // Check if the drone list attendee appears on gist data
-        var j = 0;
-        while (j < gistData.length) {
-          // Matching ID found, update last seen
-          if (pid == Object.keys(gistData)[j]) {
-            console.log("Updating ", gistData[pid][0]["timestamp"], " to ", time.toISOString());
-            gistData[pid][0]["timestamp"] = time.toISOString();
-
-            // If distance has shortened, update it
-            if (Object.keys(gistData)[j][0]["dist"] > eudis) {
-              Object.keys(gistData)[j][0]["dist"] = eudis;
-            }
-          }
-          // If identical ID is found, then do not re-add
-          else {
-            data = {}
-          }
+        // Make sure JSON document isn't null or undefined
+        if (jsonPilotDoc != null) {
+          var pname = jsonPilotDoc['firstName'] + " " + jsonPilotDoc['lastName']
+          var ppnum = jsonPilotDoc['phoneNumber'];
+          var pemail = jsonPilotDoc['email'];
+          var pid = jsonPilotDoc['pilotId'];
         }
         
-        // Form new JSON object from old and new data
-        var dataStr = JSON.stringify(data);
-        dataStr = dataStr.replace("violator", pid);
-        data = JSON.parse(dataStr);
-        // Fetch old data
-        //gistData = await getGData();
-        dataOut = Object.assign({}, gistData, data);
-        console.log("dataOut: ", dataOut)
+        // If it's within 100-meter radius
+        if (eucDis(x, y) <= 100000) {
+          // Form JSON data object from violating pilot
+          data = {
+            "violator": [{
+              "dronesn": snum,
+              "pilotid": pid,
+              "pname": pname,
+              "pemail": pemail,
+              "ppnum": ppnum,
+              "timestamp": timestamp,
+              "dist": eudis,
+            }]
+          };
 
-        // Check timestamps and delete objects accordingly
-        var k = 0;
-        while (k < gistData.length) {
-          var key = Object.keys(data)[k];
-          var keyDate = gistData[key][0]["timestamp"];
+          // Check if the violator appears on gist data
+          var j = 0;
+          while (j < gistData.length) {
+            // Matching ID found, update last seen
+            if (pid == Object.keys(gistData)[j]) {
+              console.log("Updating ", gistData[pid][0]["timestamp"], " to ", time.toISOString());
+              gistData[pid][0]["timestamp"] = time.toISOString();
 
-          // If 10 minutes have passed
-          console.log("timedelta: ", dateFromString(keyDate).getTime() - time.getTime())
-          if (dateFromString(keyDate).getTime() - time.getTime() <= 600000) {
-            console.log("deleted because of time!")
-            delete dataOut[key];
+              // If distance has shortened, update it
+              if (Object.keys(gistData)[j][0]["dist"] > eudis) {
+                Object.keys(gistData)[j][0]["dist"] = eudis;
+              }
+            }
+            // If identical ID is found, then do not re-enter it
+            else {
+              data = {}
+            }
+            j += 1;
+
           }
+
+          // Form new JSON object from old and new data
+          var dataStr = JSON.stringify(data);
+          dataStr = dataStr.replace("violator", pid);
+          data = JSON.parse(dataStr);
+          dataOut = Object.assign({}, gistData, data);
+          //console.log("dataOut: ", dataOut)
+
+        }
+        // Filter outdated entries
+        dataOut = filterList(dataOut);
+
+        // Update look of HTML element
+        var output = document.getElementById("out");
+        output.innerHTML = "";
+        //console.log("dataout output length: ", Object.keys(dataOut).length);
+        var title = `<th>Violator</th>
+                    <th>Pilot ID</th>
+                    <th>Phone Number</th>
+                    <th>Closest Distance</th>
+                    <th>Timestamp</th>`;
+        output.innerHTML += title;
+        for (var i = 0; i < Object.keys(dataOut).length; i++) {
+          var key = Object.keys(dataOut)[i];
+          var row = `<tr>
+                      <td>${dataOut[key][0]["pname"]}</td>
+                      <td>${dataOut[key][0]["pemail"]}</td>
+                      <td>${dataOut[key][0]["ppnum"]}</td>
+                      <td>${(dataOut[key][0]["dist"] / 1000) + " meters"}</td>
+                      <td>${dataOut[key][0]["timestamp"]}</td>
+                  </tr>`;
+          output.innerHTML += row;
         }
 
-        // Save the data changes
-        //setGData(dataOut);
-
+      } catch (error) {
+        console.log("Error handling data: ", error);
       }
-      else {
-        //dataOut = await getGData();
-      }
-
-      // Update look of HTML element
-      var output = document.getElementById("out");
-      output.innerHTML = 'Violators:' + "<br />" + JSON.stringify(dataOut);
-
-      // Save data to gist
-      //setGData(dataOut);
-
       i += 1;
     }
     // Save data to gist
@@ -183,7 +155,34 @@ async function start() {
     setGData(dataOut);
   }
   // Repeats function (every 15s)
-  // setTimeout(start, 15000);
+  setTimeout(start, 15000);
+}
+
+// Filters outdated entries out
+function filterList(object) {
+  var time = new Date();
+  var filteredObject = {};
+
+  if (object != undefined && object != null) {
+    filteredObject = object;
+    // Check timestamps and delete old objects accordingly
+    var k = 0;
+    //console.log("dataOut length: ", Object.keys(filteredObject).length);
+    while (k < Object.keys(filteredObject).length) {
+      var key = Object.keys(filteredObject)[k];
+      var value = Object.values(filteredObject)[k][0]["timestamp"];
+      var valueDate = dateFromString(value);
+      //console.log("value (time): ", value);
+
+      // If 10 minutes have passed
+      if (time.getMinutes() - valueDate.getMinutes() >= 10
+        || time.getMinutes() - valueDate.getMinutes() <= -10) {
+        delete filteredObject[key];
+      }
+      k += 1;
+    }
+  }
+  return filteredObject;
 }
 
 function dateFromString(string) {
@@ -213,13 +212,6 @@ function eucDis(x1, y1) {
   }
 }
 
-function itera(list) {
-  console.log("iterating")
-  for (i in list) {
-    console.log(i);
-  }
-}
-
 // Fetch set gist (temp) data
 async function getGData() {
   const req = await fetch(`https://api.github.com/gists/${GIST_ID}`);
@@ -243,7 +235,6 @@ async function setGData(data) {
       },
     }),
   });
-
   return req.json();
 }
 
