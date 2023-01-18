@@ -170,14 +170,12 @@ function filterList(object) {
     filteredObject = object;
     // Check timestamps and delete old objects accordingly
     var k = 0;
-    //console.log("dataOut length: ", Object.keys(filteredObject).length);
     while (k < Object.keys(filteredObject).length) {
       var key = Object.keys(filteredObject)[k];
       var value = Object.values(filteredObject)[k][0]["timestamp"];
       var oldTime = new Date(value);
       var curTime = new Date();
       var delta = (curTime - oldTime) / 60000;
-      console.log("aikojen erotus (min): ", delta);
       // If 10 minutes have passed
       if (delta >= 10) {
         console.log("Deleted an entry!");
